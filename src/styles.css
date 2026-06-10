@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;0,900;1,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Manrope:wght@500;600;700;800&display=swap');
 
 /* ============================================================
-   История России — Creative editorial redesign
+   История России - Creative editorial redesign
    Tokens
    ============================================================ */
 :root {
@@ -142,7 +142,7 @@ a {
 }
 
 /* ============================================================
-   Navbar — floating glass
+   Navbar - floating glass
    ============================================================ */
 .navbar {
   position: sticky;
@@ -230,7 +230,7 @@ a {
 }
 
 /* ============================================================
-   Hero — cinematic
+   Hero - cinematic
    ============================================================ */
 .hero {
   position: relative;
@@ -440,7 +440,7 @@ a {
 }
 
 /* ============================================================
-   Chapters — horizontal slide system
+   Chapters - horizontal slide system
    ============================================================ */
 .chapters {
   background: var(--cream);
@@ -606,7 +606,7 @@ a {
 }
 
 /* ============================================================
-   Road of history — winding SVG timeline (dark centerpiece)
+   Road of history - winding SVG timeline (dark centerpiece)
    ============================================================ */
 .road-section {
   position: relative;
@@ -832,7 +832,7 @@ a {
 }
 
 /* ============================================================
-   Cards — scientists
+   Cards - scientists
    ============================================================ */
 .cards {
   display: grid;

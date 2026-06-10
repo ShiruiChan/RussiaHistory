@@ -42,7 +42,7 @@ export default function ChapterSlides({ chapters }) {
         <div className="section__head" style={{ marginBottom: 0 }} data-reveal>
           <span className="kicker">Эпохи</span>
           <h2>Пять глав одной истории</h2>
-          <p>Пролистайте ключевые периоды — от древних княжеств до наших дней.</p>
+          <p>Пролистайте ключевые периоды - от древних княжеств до наших дней.</p>
         </div>
         <div className="slides__nav">
           <button
