@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 /* Lane geometry (user units == pixels: SVG is rendered at 1:1) */
 const LANE = 260
-const LANE_MOBILE = 96
 const ROW = 300
-const ROW_MOBILE = 230
 const BREAK = '(max-width: 900px)'
 
 function buildPath(nodes, laneW, totalH) {
@@ -25,8 +23,10 @@ function buildPath(nodes, laneW, totalH) {
 export default function WindingTimeline({ items }) {
   const wrapRef = useRef(null)
   const pathRef = useRef(null)
+  const fillRef = useRef(null)
   const dotRefs = useRef([])
   const yearRefs = useRef([])
+  const markerRefs = useRef([])
   const [mobile, setMobile] = useState(false)
 
   useEffect(() => {
@@ -37,51 +37,93 @@ export default function WindingTimeline({ items }) {
     return () => mq.removeEventListener('change', apply)
   }, [])
 
-  const laneW = mobile ? LANE_MOBILE : LANE
-  const row = mobile ? ROW_MOBILE : ROW
-  const totalH = items.length * row
-
-  const xA = mobile ? 30 : 60
-  const xB = mobile ? 66 : laneW - 60
-
+  const laneW = LANE
+  const totalH = items.length * ROW
   const nodes = items.map((it, i) => ({
     ...it,
     i,
-    x: i % 2 === 0 ? xA : xB,
-    y: i * row + row * 0.5,
+    x: i % 2 === 0 ? 60 : laneW - 60,
+    y: i * ROW + ROW * 0.5,
   }))
-
   const d = buildPath(nodes, laneW, totalH)
 
-  /* draw the road + light up stations on scroll */
+  /* Reveal cards locally so they animate even after a mobile/desktop swap. */
   useEffect(() => {
-    const path = pathRef.current
     const wrap = wrapRef.current
-    if (!path || !wrap) return
-
+    if (!wrap) return
+    const els = wrap.querySelectorAll('[data-reveal]:not(.is-revealed)')
+    if (!els.length) return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const len = path.getTotalLength()
-    path.style.strokeDasharray = `${len}`
-    path.style.strokeDashoffset = reduce ? '0' : `${len}`
+    if (reduce || !('IntersectionObserver' in window)) {
+      els.forEach((el) => el.classList.add('is-revealed'))
+      return
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-revealed')
+            io.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+    )
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [mobile])
+
+  /* Draw the road / fill the rail and light up stations on scroll. */
+  useEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    const path = pathRef.current
+    let len = 0
+    if (!mobile && path) {
+      len = path.getTotalLength()
+      path.style.strokeDasharray = `${len}`
+      path.style.strokeDashoffset = reduce ? '0' : `${len}`
+    }
 
     let raf = 0
     const update = () => {
       raf = 0
-      const rect = wrap.getBoundingClientRect()
       const vh = window.innerHeight || 800
+
+      if (mobile) {
+        const active = vh * 0.62
+        const rect = wrap.getBoundingClientRect()
+        let fill = active - rect.top
+        fill = Math.max(0, Math.min(rect.height, fill))
+        if (fillRef.current) {
+          fillRef.current.style.height = reduce ? `${rect.height}px` : `${fill}px`
+        }
+        markerRefs.current.forEach((m, idx) => {
+          if (!m) return
+          const on = reduce || m.getBoundingClientRect().top <= active
+          dotRefs.current[idx]?.classList.toggle('is-on', on)
+          yearRefs.current[idx]?.classList.toggle('is-on', on)
+        })
+        return
+      }
+
+      if (!path) return
+      const rect = wrap.getBoundingClientRect()
       const start = vh * 0.82
       const span = rect.height + vh * 0.5
       let p = (start - rect.top) / span
       p = Math.max(0, Math.min(1, p))
       if (!reduce) path.style.strokeDashoffset = `${len * (1 - p)}`
-
       const yOn = p * (totalH + vh * 0.5) - vh * 0.05
       nodes.forEach((n, idx) => {
-        const on = n.y <= yOn
+        const on = reduce || n.y <= yOn
         dotRefs.current[idx]?.classList.toggle('is-on', on)
         yearRefs.current[idx]?.classList.toggle('is-on', on)
       })
     }
+
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update)
     }
@@ -96,25 +138,49 @@ export default function WindingTimeline({ items }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d, totalH, mobile])
 
-  const dotLeft = (n) =>
-    mobile ? `${24 + n.x}px` : `calc(50% + ${n.x - laneW / 2}px)`
-  const svgStyle = mobile
-    ? { left: 24, marginLeft: 0 }
-    : { left: '50%', marginLeft: -laneW / 2 }
+  /* ---- Mobile: normal-flow vertical rail (cards can never overlap) ---- */
+  if (mobile) {
+    return (
+      <div className="rail" ref={wrapRef}>
+        <span className="rail__track" aria-hidden="true" />
+        <span className="rail__fill" ref={fillRef} aria-hidden="true" />
+        {items.map((it, i) => (
+          <div className="rail__item" key={it.year}>
+            <span className="rail__node" ref={(el) => (markerRefs.current[i] = el)}>
+              <span
+                className="rail__dot"
+                ref={(el) => (dotRefs.current[i] = el)}
+              />
+            </span>
+            <article className="rail__card" data-reveal>
+              <span
+                className="rail__year"
+                ref={(el) => (yearRefs.current[i] = el)}
+              >
+                {it.year}
+              </span>
+              <span className="station__index">
+                Глава {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3>{it.title}</h3>
+              <p>{it.text}</p>
+            </article>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
+  /* ---- Desktop: winding SVG road ---- */
   return (
-    <div
-      className={'road' + (mobile ? ' road--mobile' : '')}
-      ref={wrapRef}
-      style={{ height: totalH }}
-    >
+    <div className="road" ref={wrapRef} style={{ height: totalH }}>
       <svg
         className="road__svg"
         width={laneW}
         height={totalH}
         viewBox={`0 0 ${laneW} ${totalH}`}
         preserveAspectRatio="xMidYMid meet"
-        style={svgStyle}
+        style={{ left: '50%', marginLeft: -laneW / 2 }}
         aria-hidden="true"
       >
         <defs>
@@ -144,12 +210,12 @@ export default function WindingTimeline({ items }) {
           <span
             className="station__dot"
             ref={(el) => (dotRefs.current[i] = el)}
-            style={{ left: dotLeft(n) }}
+            style={{ left: `calc(50% + ${n.x - laneW / 2}px)` }}
           />
           <span
             className="station__year-float"
             ref={(el) => (yearRefs.current[i] = el)}
-            style={{ left: dotLeft(n) }}
+            style={{ left: `calc(50% + ${n.x - laneW / 2}px)` }}
           >
             {n.year}
           </span>
